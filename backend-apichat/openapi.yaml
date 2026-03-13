@@ -1,0 +1,559 @@
+openapi: 3.0.3
+info:
+  title: Chat en Vivo API
+  description: >
+    API para registro/login de usuarios y mensajería en tiempo real mediante
+    WebSockets. Incluye autenticación con JWT, paginación de historial y
+    contratos de error estandarizados.
+  version: 1.1.0
+
+servers:
+  - url: http://localhost:3000
+    description: Servidor local
+  - url: https://chat-api-staging.onrender.com
+    description: Servidor de staging
+  - url: https://tu-api-chat.onrender.com
+    description: Servidor de producción
+
+tags:
+  - name: Auth
+    description: Endpoints de autenticación y sesiones
+  - name: Messages
+    description: Endpoints de mensajería e historial
+  - name: System
+    description: Endpoints operativos (health checks)
+
+security:
+  - bearerAuth: []
+
+paths:
+  /health:
+    get:
+      tags:
+        - System
+      operationId: getHealth
+      summary: Health check
+      description: Verifica si la API está levantada.
+      security: []
+      responses:
+        "200":
+          description: Servicio saludable
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/HealthResponse"
+
+  /ready:
+    get:
+      tags:
+        - System
+      operationId: getReadiness
+      summary: Readiness check
+      description: Verifica dependencias críticas (ej. base de datos, cache).
+      security: []
+      responses:
+        "200":
+          description: Servicio listo para recibir tráfico
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ReadyResponse"
+        "503":
+          $ref: "#/components/responses/InternalServerError"
+
+  /v1/auth/register:
+    post:
+      tags:
+        - Auth
+      operationId: registerUser
+      summary: Registro de usuario
+      description: Crea un nuevo usuario y devuelve tokens de sesión.
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UserRegisterRequest"
+            examples:
+              registroEjemplo:
+                value:
+                  username: "ana_dev"
+                  password: "Str0ngP@ssw0rd123"
+      responses:
+        "201":
+          description: Usuario creado exitosamente
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AuthResponse"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "409":
+          $ref: "#/components/responses/Conflict"
+        "422":
+          $ref: "#/components/responses/UnprocessableEntity"
+        "429":
+          $ref: "#/components/responses/TooManyRequests"
+        "500":
+          $ref: "#/components/responses/InternalServerError"
+
+  /v1/auth/login:
+    post:
+      tags:
+        - Auth
+      operationId: loginUser
+      summary: Login de usuario
+      description: Autentica al usuario y devuelve tokens (access + refresh).
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/LoginRequest"
+            examples:
+              loginEjemplo:
+                value:
+                  username: "ana_dev"
+                  password: "Str0ngP@ssw0rd123"
+      responses:
+        "200":
+          description: Login exitoso
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AuthResponse"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "429":
+          $ref: "#/components/responses/TooManyRequests"
+        "500":
+          $ref: "#/components/responses/InternalServerError"
+
+  /v1/auth/refresh:
+    post:
+      tags:
+        - Auth
+      operationId: refreshSessionToken
+      summary: Renovar access token
+      description: Emite un nuevo par de tokens a partir de un refresh token válido.
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/RefreshTokenRequest"
+      responses:
+        "200":
+          description: Tokens renovados
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/TokenPair"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "429":
+          $ref: "#/components/responses/TooManyRequests"
+        "500":
+          $ref: "#/components/responses/InternalServerError"
+
+  /v1/auth/logout:
+    post:
+      tags:
+        - Auth
+      operationId: logoutUser
+      summary: Cerrar sesión
+      description: Revoca la sesión activa del usuario autenticado.
+      responses:
+        "204":
+          description: Sesión cerrada correctamente
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "500":
+          $ref: "#/components/responses/InternalServerError"
+
+  /v1/messages/history:
+    get:
+      tags:
+        - Messages
+      operationId: getMessageHistory
+      summary: Historial de mensajes
+      description: Devuelve mensajes paginados del chat, ordenados por fecha descendente.
+      parameters:
+        - $ref: "#/components/parameters/RoomIdParam"
+        - $ref: "#/components/parameters/CursorParam"
+        - $ref: "#/components/parameters/LimitParam"
+      responses:
+        "200":
+          description: Lista paginada de mensajes
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/MessageHistoryResponse"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "422":
+          $ref: "#/components/responses/UnprocessableEntity"
+        "429":
+          $ref: "#/components/responses/TooManyRequests"
+        "500":
+          $ref: "#/components/responses/InternalServerError"
+
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+
+  parameters:
+    RoomIdParam:
+      name: roomId
+      in: query
+      required: true
+      description: Identificador de sala del chat.
+      schema:
+        type: string
+        minLength: 1
+      example: "general"
+
+    CursorParam:
+      name: cursor
+      in: query
+      required: false
+      description: Cursor para paginación (id del último mensaje recibido).
+      schema:
+        type: string
+        minLength: 1
+      example: "67cddb183c5acb0fd1012abc"
+
+    LimitParam:
+      name: limit
+      in: query
+      required: false
+      description: Cantidad máxima de mensajes por página.
+      schema:
+        type: integer
+        minimum: 1
+        maximum: 100
+        default: 50
+      example: 50
+
+  responses:
+    BadRequest:
+      description: Request mal formado
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/ErrorResponse"
+          examples:
+            badRequest:
+              value:
+                code: BAD_REQUEST
+                message: "El request contiene parámetros inválidos"
+                requestId: "req_7f1a"
+                timestamp: "2026-03-10T18:30:00Z"
+
+    Unauthorized:
+      description: No autenticado o token inválido
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/ErrorResponse"
+
+    Forbidden:
+      description: No autorizado para este recurso
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/ErrorResponse"
+
+    NotFound:
+      description: Recurso no encontrado
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/ErrorResponse"
+
+    Conflict:
+      description: Conflicto de estado (ej. username ya existe)
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/ErrorResponse"
+
+    UnprocessableEntity:
+      description: Error de validación de dominio
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/ErrorResponse"
+
+    TooManyRequests:
+      description: Límite de peticiones excedido
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/ErrorResponse"
+
+    InternalServerError:
+      description: Error interno del servidor
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/ErrorResponse"
+
+  schemas:
+    UserRegisterRequest:
+      type: object
+      required:
+        - username
+        - password
+      properties:
+        username:
+          type: string
+          minLength: 3
+          maxLength: 30
+          pattern: "^[a-zA-Z0-9_]+$"
+        password:
+          type: string
+          minLength: 8
+          maxLength: 128
+          description: Debe contener letras, números y al menos un símbolo.
+
+    LoginRequest:
+      type: object
+      required:
+        - username
+        - password
+      properties:
+        username:
+          type: string
+          minLength: 3
+          maxLength: 30
+        password:
+          type: string
+          minLength: 8
+          maxLength: 128
+
+    RefreshTokenRequest:
+      type: object
+      required:
+        - refreshToken
+      properties:
+        refreshToken:
+          type: string
+          minLength: 20
+
+    TokenPair:
+      type: object
+      required:
+        - accessToken
+        - refreshToken
+        - tokenType
+        - expiresIn
+      properties:
+        accessToken:
+          type: string
+        refreshToken:
+          type: string
+        tokenType:
+          type: string
+          example: Bearer
+        expiresIn:
+          type: integer
+          description: Expiración del access token en segundos.
+          example: 900
+
+    AuthUser:
+      type: object
+      required:
+        - id
+        - username
+      properties:
+        id:
+          type: string
+          example: "67cddb183c5acb0fd1012abc"
+        username:
+          type: string
+          example: "ana_dev"
+
+    AuthResponse:
+      type: object
+      required:
+        - user
+        - tokens
+      properties:
+        user:
+          $ref: "#/components/schemas/AuthUser"
+        tokens:
+          $ref: "#/components/schemas/TokenPair"
+
+    Message:
+      type: object
+      required:
+        - id
+        - roomId
+        - userId
+        - username
+        - message
+        - createdAt
+      properties:
+        id:
+          type: string
+          example: "67cddb183c5acb0fd1012aaa"
+        roomId:
+          type: string
+          example: "general"
+        userId:
+          type: string
+          example: "67cddb183c5acb0fd1012abc"
+        username:
+          type: string
+          example: "ana_dev"
+        message:
+          type: string
+          minLength: 1
+          maxLength: 2000
+          example: "Hola equipo, ya quedó desplegado el backend."
+        createdAt:
+          type: string
+          format: date-time
+
+    MessageHistoryResponse:
+      type: object
+      required:
+        - data
+        - hasMore
+      properties:
+        data:
+          type: array
+          items:
+            $ref: "#/components/schemas/Message"
+        nextCursor:
+          type: string
+          nullable: true
+          example: "67cddb183c5acb0fd1012aaa"
+        hasMore:
+          type: boolean
+          example: true
+
+    ValidationErrorDetail:
+      type: object
+      required:
+        - field
+        - issue
+      properties:
+        field:
+          type: string
+          example: password
+        issue:
+          type: string
+          example: Debe tener mínimo 8 caracteres
+
+    ErrorResponse:
+      type: object
+      required:
+        - code
+        - message
+        - requestId
+        - timestamp
+      properties:
+        code:
+          type: string
+          example: VALIDATION_ERROR
+        message:
+          type: string
+          example: El payload no cumple las reglas de validación
+        details:
+          type: array
+          items:
+            $ref: "#/components/schemas/ValidationErrorDetail"
+        requestId:
+          type: string
+          example: req_7f1a
+        timestamp:
+          type: string
+          format: date-time
+
+    HealthResponse:
+      type: object
+      required:
+        - status
+        - timestamp
+      properties:
+        status:
+          type: string
+          example: ok
+        timestamp:
+          type: string
+          format: date-time
+
+    ReadyResponse:
+      type: object
+      required:
+        - status
+        - dependencies
+        - timestamp
+      properties:
+        status:
+          type: string
+          example: ready
+        dependencies:
+          type: object
+          additionalProperties:
+            type: string
+          example:
+            database: up
+            redis: up
+        timestamp:
+          type: string
+          format: date-time
+
+x-websocket:
+  /chat:
+    description: >
+      Conexión WebSocket para enviar y recibir mensajes en tiempo real.
+      El cliente debe enviar JWT en el handshake (`auth.token`).
+    version: v1
+    authentication:
+      type: bearer
+      location: handshake.auth.token
+    events:
+      - name: chat.message.send
+        direction: client_to_server
+        description: Evento para enviar un mensaje.
+        payload:
+          type: object
+          required:
+            - roomId
+            - message
+          properties:
+            roomId:
+              type: string
+            message:
+              type: string
+              minLength: 1
+              maxLength: 2000
+      - name: chat.message.received
+        direction: server_to_client
+        description: Evento emitido cuando llega un nuevo mensaje al cliente.
+        payload:
+          $ref: "#/components/schemas/Message"
+      - name: chat.user.joined
+        direction: server_to_client
+        description: Evento emitido cuando un usuario se conecta.
+      - name: chat.user.left
+        direction: server_to_client
+        description: Evento emitido cuando un usuario se desconecta.
+      - name: chat.error
+        direction: server_to_client
+        description: Errores de protocolo o validación en socket.
+        payload:
+          $ref: "#/components/schemas/ErrorResponse"
