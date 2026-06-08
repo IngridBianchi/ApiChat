@@ -1,10 +1,13 @@
 import express from "express";
+import cookieParser from "cookie-parser";
 import routes from "./api/http/routes/index.js";
 import { config } from "./shared/config/index.js";
 import { errorHandler } from "./shared/errors/errorHandler.js";
 import { requestLogger } from "./shared/logger/index.js";
 import { NotFoundError } from "./shared/errors/BaseError.js";
 import { observeRequestDuration } from "./shared/telemetry/index.js";
+import { createSecurityHeadersMiddleware } from "./api/http/middlewares/securityHeaders.js";
+import { responseMiddleware } from "./shared/utils/response.js";
 
 function createCorsMiddleware() {
   return (req, res, next) => {
@@ -29,6 +32,9 @@ function createCorsMiddleware() {
 export function createApp() {
   const app = express();
 
+  app.use(createSecurityHeadersMiddleware());
+  app.use(cookieParser());
+  app.use(responseMiddleware);
   app.use(createCorsMiddleware());
   app.use(express.json({ limit: "1mb" }));
   app.use(requestLogger);

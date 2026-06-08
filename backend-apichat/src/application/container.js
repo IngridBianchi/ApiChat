@@ -11,6 +11,10 @@ export const container = {
     authService,
     messageService,
   },
+  repositories: {
+    userRepository,
+    messageRepository,
+  },
   security: {
     tokenService,
   },

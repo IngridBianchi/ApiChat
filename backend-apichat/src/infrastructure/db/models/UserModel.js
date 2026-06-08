@@ -10,6 +10,11 @@ const userSchema = new mongoose.Schema(
       minlength: 3,
       maxlength: 30,
     },
+    orgId: {
+      type: String,
+      default: 'default',
+      index: true,
+    },
     passwordHash: { type: String, required: true, select: false },
     refreshTokenHash: { type: String, default: null, select: false },
   },

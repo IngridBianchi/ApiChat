@@ -1,40 +1,34 @@
+import rateLimit from 'express-rate-limit';
+import RedisStore from 'rate-limit-redis';
+import { config } from "../../../shared/config/index.js";
 import { TooManyRequestsError } from "../../../shared/errors/BaseError.js";
+import { createClient } from "redis";
+import { logger } from "../../../shared/logger/index.js";
 
-// In-memory limiter for MVP. Replace with Redis-backed store for horizontal scaling.
-function createMemoryLimiter({ windowMs, max }) {
-  const buckets = new Map();
-
-  return (key) => {
-    const now = Date.now();
-    const current = buckets.get(key);
-
-    if (!current || current.expiresAt <= now) {
-      buckets.set(key, { count: 1, expiresAt: now + windowMs });
-      return { allowed: true, remaining: max - 1 };
-    }
-
-    current.count += 1;
-    buckets.set(key, current);
-
-    const remaining = Math.max(0, max - current.count);
-    return { allowed: current.count <= max, remaining };
-  };
+let redisClient = null;
+if (config.redisUrl) {
+  redisClient = createClient({ url: config.redisUrl });
+  redisClient.connect().catch(err => logger.error({ err }, "Error connecting Redis for Rate Limit"));
 }
 
-export function createRateLimitMiddleware({ windowMs, max, keyGenerator }) {
-  const check = createMemoryLimiter({ windowMs, max });
-
-  return (req, res, next) => {
-    const key = keyGenerator(req);
-    const result = check(key);
-
-    res.setHeader("x-ratelimit-limit", String(max));
-    res.setHeader("x-ratelimit-remaining", String(result.remaining));
-
-    if (!result.allowed) {
-      return next(new TooManyRequestsError("Límite de intentos excedido"));
+export function createRateLimitMiddleware({ windowMs, max, message, keyGenerator }) {
+  const options = {
+    windowMs,
+    max,
+    standardHeaders: true,
+    legacyHeaders: false,
+    keyGenerator,
+    handler: (req, res, next) => {
+      next(new TooManyRequestsError(message || "Límite de intentos excedido"));
     }
-
-    next();
   };
+
+  if (redisClient) {
+    options.store = new RedisStore({
+      sendCommand: (...args) => redisClient.sendCommand(args),
+      prefix: 'rate-limit:',
+    });
+  }
+
+  return rateLimit(options);
 }

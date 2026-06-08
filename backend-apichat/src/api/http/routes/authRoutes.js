@@ -10,7 +10,6 @@ const router = express.Router();
 const authRateLimit = createRateLimitMiddleware({
 	windowMs: config.authRateLimitWindowMs,
 	max: config.authRateLimitMax,
-	keyGenerator: (req) => `${req.ip}:${req.path}`,
 });
 
 router.post("/v1/auth/register", authRateLimit, validate(registerSchema), register);

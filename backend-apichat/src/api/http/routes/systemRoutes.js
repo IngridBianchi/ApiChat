@@ -3,8 +3,14 @@ import mongoose from "mongoose";
 import client from "prom-client";
 import "../../../shared/telemetry/index.js";
 import { getRedisHealth } from "../../../infrastructure/cache/socketRedisAdapter.js";
+import { createCsrfProtection } from "../middlewares/csrfProtection.js";
 
 const router = express.Router();
+const csrfProtection = createCsrfProtection();
+
+router.get("/v1/csrf-token", csrfProtection, (req, res) => {
+  res.json({ csrfToken: req.csrfToken() });
+});
 
 router.get("/health", (req, res) => {
   res.status(200).json({ status: "ok", timestamp: new Date().toISOString() });

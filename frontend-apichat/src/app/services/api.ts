@@ -12,6 +12,7 @@ export interface Message {
   username: string;
   message: string;
   createdAt: string;
+  reactions?: any[];
 }
 
 export interface AuthTokens {
@@ -26,10 +27,18 @@ export interface AuthResponse {
   tokens: AuthTokens;
 }
 
-interface HistoryResponse {
-  data: Message[];
-  hasMore: boolean;
-  nextCursor: string | null;
+export interface StandardResponse<T> {
+  status: string;
+  statusCode: number;
+  message: string;
+  data: T;
+  pagination?: {
+    limit: number;
+    hasMore: boolean;
+    nextCursor: string | null;
+    count: number;
+  };
+  timestamp: string;
 }
 
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || "http://localhost:3000/v1";
@@ -51,6 +60,7 @@ export function normalizeMessage(payload: Partial<Message>): Message {
     username: String(payload.username || ""),
     message: String(payload.message || ""),
     createdAt: String(payload.createdAt || new Date().toISOString()),
+    reactions: payload.reactions || [],
   };
 }
 
@@ -91,7 +101,8 @@ class ApiClient {
       throw new Error("Refresh token expirado o invalido");
     }
 
-    const tokens = (await refreshResponse.json()) as AuthTokens;
+    const envelope = (await refreshResponse.json()) as StandardResponse<AuthTokens>;
+    const tokens = envelope.data;
     localStorage.setItem("token", tokens.accessToken);
     localStorage.setItem("refreshToken", tokens.refreshToken);
 
@@ -142,16 +153,29 @@ class ApiClient {
       response = await fetch(`${API_BASE_URL}${endpoint}`, { ...options, headers });
     }
 
+    const responseData = await response.json().catch(() => ({}));
+
     if (!response.ok) {
-      const errorData = await response.json().catch(() => ({}));
-      throw new Error(errorData.message || `Error: ${response.status}`);
+      throw new Error(responseData.message || `Error: ${response.status}`);
     }
 
     if (response.status === 204) {
       return null as T;
     }
 
-    return (await response.json()) as T;
+    // Si la respuesta viene envuelta en el StandardResponse, devolvemos solo la data
+    if (responseData && responseData.status === 'success' && 'data' in responseData) {
+      // Para respuestas paginadas, devolvemos un objeto que incluya la data y la paginación
+      if (responseData.pagination) {
+        return {
+          data: responseData.data,
+          ...responseData.pagination
+        } as unknown as T;
+      }
+      return responseData.data as T;
+    }
+
+    return responseData as T;
   }
 
   async register(data: { username: string; password: string }) {
@@ -175,7 +199,9 @@ class ApiClient {
   }
 
   async getHistory(roomId: string) {
-    const response = await this.fetch<HistoryResponse>(`/messages/history?roomId=${encodeURIComponent(roomId)}`);
+    const response = await this.fetch<{ data: Message[]; hasMore: boolean; nextCursor: string | null }>(
+      `/messages/history?roomId=${encodeURIComponent(roomId)}`
+    );
     return {
       ...response,
       data: [...response.data].reverse().map((message) => normalizeMessage(message)),
@@ -216,6 +242,10 @@ export class SocketClient {
 
     this.socket.on("chat.message.received", (payload: Message) => {
       this.emitToLocalListeners("chat.message.received", normalizeMessage(payload));
+    });
+
+    this.socket.on("chat.message.reaction_updated", (payload: Message) => {
+      this.emitToLocalListeners("chat.message.reaction_updated", normalizeMessage(payload));
     });
 
     this.socket.on("chat.user.joined", (payload: any) => {

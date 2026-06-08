@@ -1,50 +1,59 @@
+# APICHAT - Frontend Application
 
-# Frontend APIChat
+Modern React + Vite frontend for the APICHAT messaging platform.
 
-Frontend React + Vite adaptado para el backend de `backend-apichat`.
+## 🚀 Optimized Features
 
-## Requisitos
+*   **Smart Bundling:** Vite configuration with `terser` minification and code splitting.
+*   **Compression:** Static assets served with Gzip and Brotli support.
+*   **Error Resilience:** **Error Boundaries** implemented to prevent app crashes and provide recovery UI.
+*   **Standardized API:** Built-in support for the backend's standard response envelope and automatic token refreshing.
+*   **Real-time Interaction:** Enhanced Socket.IO client with support for message reactions and typing indicators.
+*   **Performance:** Optimized component rendering and asset delivery.
 
-- Node.js 20+
-- Backend levantado en `http://localhost:3000`
+## 📋 Requirements
 
-## Configuracion
+*   Node.js 20+
+*   Backend running at `http://localhost:3000`
 
-1. Instalar dependencias:
+## ⚙️ Configuration & Setup
 
-```bash
-npm install
-```
+1.  **Install dependencies:**
+    ```bash
+    npm install
+    ```
+2.  **Environment Variables:**
+    ```bash
+    cp .env.example .env
+    ```
+    Key variables:
+    *   `VITE_API_BASE_URL`: Base API endpoint (default: `http://localhost:3000/v1`)
+    *   `VITE_SOCKET_URL`: WebSocket server (default: `http://localhost:3000`)
 
-2. Crear archivo de entorno:
+3.  **Start in Development:**
+    ```bash
+    npm run dev
+    ```
+    Access at: `http://localhost:5173`
 
-```powershell
-Copy-Item .env.example .env
-```
+## 📡 Backend Integration
 
-3. Variables disponibles:
+### **Authentication**
+Fully integrated with the `/v1/auth` system including automatic retry logic for expired tokens.
 
-- `VITE_API_BASE_URL` (default: `http://localhost:3000/v1`)
-- `VITE_SOCKET_URL` (default: `http://localhost:3000`)
+### **Messaging**
+*   **History:** Cursor-based infinite scrolling support.
+*   **Reactions:** Real-time emoji reaction syncing.
+*   **Typing:** Visual indicators for active users.
 
-## Desarrollo
+### **Real-time Events**
+Handles `chat.message.received`, `chat.message.reaction_updated`, `chat.user.joined`, `chat.user.left`, and `chat.user.typing`.
 
-```bash
-npm run dev
-```
+## 🏗️ Tech Stack
 
-App local: `http://localhost:5173`
-
-## Integracion con backend
-
-- Auth HTTP:
-  - `POST /v1/auth/register`
-  - `POST /v1/auth/login`
-  - `POST /v1/auth/refresh`
-  - `POST /v1/auth/logout`
-- Mensajes:
-  - `GET /v1/messages/history?roomId=<id>`
-- Socket:
-  - Conexion con `socket.io-client` usando `auth.token`
-  - Eventos: `chat.room.join`, `chat.message.send`, `chat.message.received`, `chat.user.joined`, `chat.user.left`, `chat.error`
-  
+*   **Core:** React 18, TypeScript, Vite
+*   **State:** Context API
+*   **Real-time:** socket.io-client
+*   **Styling:** Tailwind CSS, Radix UI
+*   **Validation:** Zod
+*   **Build Optimization:** rollup-plugin-visualizer, vite-plugin-compression

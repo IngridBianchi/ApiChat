@@ -2,6 +2,7 @@ import crypto from "node:crypto";
 import jwt from "jsonwebtoken";
 import { config } from "../../shared/config/index.js";
 import { UnauthorizedError } from "../../shared/errors/BaseError.js";
+import { secretManager } from "./secretManager.js";
 
 function normalizeSubject(subject) {
   if (typeof subject === "string" || typeof subject === "number") {
@@ -25,8 +26,9 @@ function signAccessToken(subject) {
     username: subject.username,
   };
 
-  return jwt.sign(payload, config.jwtSecret, {
+  return jwt.sign(payload, secretManager.getCurrentSecret(), {
     expiresIn: config.jwtExpiration,
+    algorithm: 'HS256',
   });
 }
 
@@ -37,16 +39,17 @@ function signRefreshToken(subject) {
     username: subject.username,
   };
 
-  return jwt.sign(payload, config.jwtRefreshSecret, {
+  return jwt.sign(payload, secretManager.getRefreshSecret(), {
     expiresIn: config.jwtRefreshExpiration,
+    algorithm: 'HS256',
   });
 }
 
-function decodeToken(token, secret) {
+function decodeToken(token, isRefresh = false) {
   try {
-    return jwt.verify(token, secret);
+    return secretManager.verifyTokenWithRotation(token, isRefresh);
   } catch (err) {
-    throw new UnauthorizedError("Token inválido o expirado");
+    throw new UnauthorizedError(`Token inválido: ${err.message}`);
   }
 }
 
@@ -63,7 +66,7 @@ export const tokenService = {
   },
 
   verifyAccessToken(token) {
-    const payload = decodeToken(token, config.jwtSecret);
+    const payload = decodeToken(token, false);
 
     if (payload.typ !== "access") {
       throw new UnauthorizedError("Tipo de token inválido");
@@ -77,7 +80,7 @@ export const tokenService = {
   },
 
   verifyRefreshToken(token) {
-    const payload = decodeToken(token, config.jwtRefreshSecret);
+    const payload = decodeToken(token, true);
 
     if (payload.typ !== "refresh") {
       throw new UnauthorizedError("Tipo de token inválido");

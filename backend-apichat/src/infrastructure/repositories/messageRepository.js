@@ -1,6 +1,7 @@
 import mongoose from "mongoose";
 import { IMessageRepository } from "../../domain/repositories/IMessageRepository.js";
 import MessageModel from "../db/models/MessageModel.js";
+import { PaginationCursor } from "../../shared/utils/pagination.js";
 
 function mapMessage(doc) {
   if (!doc) return null;
@@ -11,6 +12,7 @@ function mapMessage(doc) {
     userId: doc.userId,
     username: doc.username,
     message: doc.message,
+    reactions: doc.reactions || [],
     createdAt: doc.createdAt,
   };
 }
@@ -31,12 +33,17 @@ export class MessageRepository extends IMessageRepository {
   async findByRoom(roomId, cursor, limit) {
     const query = { roomId };
 
-    if (cursor && mongoose.Types.ObjectId.isValid(cursor)) {
-      query._id = { $lt: new mongoose.Types.ObjectId(cursor) };
+    if (cursor) {
+      try {
+        const decoded = PaginationCursor.decode(cursor);
+        query._id = { $lt: new mongoose.Types.ObjectId(decoded.id) };
+      } catch (err) {
+        // Silently fallback to no cursor if invalid
+      }
     }
 
     const docs = await MessageModel.find(query)
-      .sort({ _id: -1 })
+      .sort({ createdAt: -1, _id: -1 })
       .limit(limit + 1)
       .exec();
 
@@ -45,10 +52,36 @@ export class MessageRepository extends IMessageRepository {
     const data = pageDocs.map(mapMessage);
 
     return {
-      data,
+      items: data,
       hasMore,
-      nextCursor: hasMore ? data[data.length - 1]?.id || null : null,
+      nextCursor: hasMore ? PaginationCursor.createNextCursor(pageDocs) : null,
+      count: data.length,
     };
+  }
+
+  async addReaction(messageId, reaction) {
+    // Primero removemos si el mismo usuario ya reaccionó con el mismo emoji (deduplicación)
+    await MessageModel.findByIdAndUpdate(
+      messageId,
+      { $pull: { reactions: { userId: reaction.userId, emoji: reaction.emoji } } }
+    );
+    
+    const updated = await MessageModel.findByIdAndUpdate(
+      messageId,
+      { $push: { reactions: reaction } },
+      { new: true }
+    );
+    
+    return mapMessage(updated);
+  }
+
+  async removeReaction(messageId, userId, emoji) {
+    const updated = await MessageModel.findByIdAndUpdate(
+      messageId,
+      { $pull: { reactions: { userId, emoji } } },
+      { new: true }
+    );
+    return mapMessage(updated);
   }
 }
 

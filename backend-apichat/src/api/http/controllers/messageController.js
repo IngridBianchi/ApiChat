@@ -6,9 +6,17 @@ export async function history(req, res, next) {
   try {
     const { roomId, cursor, limit } = req.query;
     const result = await messageService.history({ roomId, cursor, limit });
-    res.status(200).json(result);
+    
+    res.paginated(
+      result.items, 
+      { 
+        limit: result.count, 
+        hasMore: result.hasMore, 
+        nextCursor: result.nextCursor 
+      }, 
+      'Historial obtenido'
+    );
   } catch (err) {
     next(err);
   }
 }
-
