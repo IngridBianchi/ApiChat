@@ -23,7 +23,7 @@ export const config = {
   jwtRefreshSecret: process.env.JWT_REFRESH_SECRET,
   jwtExpiration: process.env.JWT_EXPIRATION || "15m",
   jwtRefreshExpiration: process.env.JWT_REFRESH_EXPIRATION || "7d",
-  corsAllowedOrigins: (process.env.CORS_ALLOWED_ORIGINS || "http://localhost:5173")
+  corsAllowedOrigins: (process.env.CORS_ALLOWED_ORIGINS || "http://localhost:5173,http://localhost:3000")
     .split(",")
     .map((origin) => origin.trim())
     .filter(Boolean),

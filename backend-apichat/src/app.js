@@ -12,10 +12,13 @@ import { responseMiddleware } from "./shared/utils/response.js";
 function createCorsMiddleware() {
   return (req, res, next) => {
     const origin = req.headers.origin;
+    const isAllowed = origin && (config.corsAllowedOrigins.includes(origin) || config.corsAllowedOrigins.includes("*"));
 
-    if (origin && config.corsAllowedOrigins.includes(origin)) {
+    if (isAllowed) {
       res.setHeader("Access-Control-Allow-Origin", origin);
       res.setHeader("Vary", "Origin");
+    } else if (config.corsAllowedOrigins.includes("*")) {
+      res.setHeader("Access-Control-Allow-Origin", "*");
     }
 
     res.setHeader("Access-Control-Allow-Methods", "GET,POST,PUT,PATCH,DELETE,OPTIONS");

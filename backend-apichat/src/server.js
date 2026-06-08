@@ -12,7 +12,7 @@ async function bootstrap() {
   const server = http.createServer(app);
   await initChatSocket(server);
 
-  server.listen(config.port, () => {
+  server.listen(config.port, "0.0.0.0", () => {
     logger.info({ port: config.port }, "Servidor iniciado");
   });
 }
