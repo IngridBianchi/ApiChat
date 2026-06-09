@@ -3,20 +3,11 @@ import path from 'path'
 import tailwindcss from '@tailwindcss/vite'
 import react from '@vitejs/plugin-react'
 import { visualizer } from 'rollup-plugin-visualizer'
-import compression from 'vite-plugin-compression'
 
 export default defineConfig({
   plugins: [
     react(),
     tailwindcss(),
-    compression({
-      algorithm: 'gzip',
-      ext: '.gz',
-    }),
-    compression({
-      algorithm: 'brotli',
-      ext: '.br',
-    }),
     visualizer({
       filename: 'dist/stats.html',
     }),
