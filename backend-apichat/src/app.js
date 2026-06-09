@@ -35,6 +35,9 @@ function createCorsMiddleware() {
 export function createApp() {
   const app = express();
 
+  // Trust Render proxy
+  app.set('trust proxy', 1);
+
   app.use(createSecurityHeadersMiddleware());
   app.use(cookieParser());
   app.use(responseMiddleware);
